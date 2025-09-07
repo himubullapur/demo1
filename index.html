@@ -183,10 +183,16 @@
             <div class="admin-container">
                 <div class="admin-header">
                     <h1>Admin Dashboard</h1>
-                    <button onclick="logout()" class="logout-btn">
-                        <i class="fas fa-sign-out-alt"></i>
-                        Logout
-                    </button>
+                    <div class="admin-header-actions">
+                        <button onclick="clearAllData()" class="clear-data-btn" title="Reset all data to defaults">
+                            <i class="fas fa-broom"></i>
+                            Clear All Data
+                        </button>
+                        <button onclick="logout()" class="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Logout
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Job Management Section -->
