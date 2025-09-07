@@ -184,10 +184,6 @@
                 <div class="admin-header">
                     <h1>Admin Dashboard</h1>
                     <div class="admin-header-actions">
-                        <button onclick="clearAllData()" class="clear-data-btn" title="Reset all data to defaults">
-                            <i class="fas fa-broom"></i>
-                            Clear All Data
-                        </button>
                         <button onclick="logout()" class="logout-btn">
                             <i class="fas fa-sign-out-alt"></i>
                             Logout
@@ -206,6 +202,25 @@
                     </div>
                     <div id="admin-job-list" class="admin-job-grid">
                         <!-- Admin job list will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Admin Management Section -->
+                <div class="management-section" style="margin-top: 2rem;">
+                    <div class="section-header">
+                        <h2>Admin Management</h2>
+                        <button onclick="showAddAdminModal()" class="add-job-btn">
+                            <i class="fas fa-user-plus"></i>
+                            Add New Admin
+                        </button>
+                    </div>
+                    
+                    <!-- Admin List -->
+                    <div class="admin-list-section">
+                        <h3>Current Admins</h3>
+                        <div id="admin-list" class="admin-list">
+                            <!-- Admin list will be loaded here -->
+                        </div>
                     </div>
                 </div>
 
@@ -484,6 +499,32 @@
                         Delete List
                     </button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Add Admin Modal -->
+        <div id="add-admin-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeAddAdminModal()">&times;</span>
+                <h2>Add New Admin</h2>
+                <form id="admin-form" onsubmit="handleAdminSubmit(event)">
+                    <div class="form-group">
+                        <label for="new-admin-username">Username</label>
+                        <input type="text" id="new-admin-username" placeholder="Enter admin username..." required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-admin-password">Password</label>
+                        <input type="password" id="new-admin-password" placeholder="Enter admin password..." required>
+                    </div>
+                    <div class="form-group">
+                        <label for="new-admin-email">Email (Optional)</label>
+                        <input type="email" id="new-admin-email" placeholder="Enter admin email...">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" onclick="closeAddAdminModal()" class="cancel-btn">Cancel</button>
+                        <button type="submit" class="submit-btn">Add Admin</button>
+                    </div>
+                </form>
             </div>
         </div>
 
