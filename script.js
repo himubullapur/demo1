@@ -19,13 +19,35 @@ async function saveDataToFirebase(data) {
     if (!isFirebaseReady) await waitForFirebase();
     
     try {
+            // Clean data for Firebase (remove functions and undefined values)
+            const cleanData = {
+                jobs: data.jobs || [],
+                shortlistedData: data.shortlistedData || [],
+                jobShortlisted: data.jobShortlisted || {},
+                notifications: (data.notifications || []).map(notification => ({
+                    id: notification.id || '',
+                    title: notification.title || '',
+                    message: notification.message || '',
+                    type: notification.type || 'info',
+                    timestamp: notification.timestamp || Date.now(),
+                    // Remove the action.callback function
+                    action: notification.action && notification.action.text ? {
+                        text: notification.action.text
+                    } : null
+                })).filter(notification => notification.id && notification.title), // Remove empty notifications
+                admins: data.admins || []
+            };
+        
         const dataRef = window.firebaseRef(window.firebaseDatabase, 'placementPortalData');
-        await window.firebaseSet(dataRef, data);
-        console.log('Data saved to Firebase');
+        await window.firebaseSet(dataRef, cleanData);
+        console.log('✅ Data saved to Firebase successfully');
+        showNotification('Data synced to cloud!', 'success');
     } catch (error) {
-        console.error('Error saving to Firebase:', error);
+        console.error('❌ Error saving to Firebase:', error);
+        console.error('Error details:', error.message);
         // Fallback to localStorage
         localStorage.setItem('placementPortalData', JSON.stringify(data));
+        showNotification('Using offline mode - data saved locally', 'warning');
     }
 }
 
@@ -43,10 +65,43 @@ async function loadDataFromFirebase() {
             AppState.jobs = data.jobs !== undefined ? data.jobs : [];
             AppState.shortlistedData = data.shortlistedData || [];
             AppState.jobShortlisted = data.jobShortlisted || {};
-            AppState.notifications = data.notifications || [];
+            
+            // Restore notifications with callback functions
+            AppState.notifications = (data.notifications || []).map(notification => {
+                const restoredNotification = {
+                    id: notification.id,
+                    title: notification.title,
+                    message: notification.message,
+                    type: notification.type,
+                    timestamp: notification.timestamp || Date.now(),
+                    time: notification.time || new Date(notification.timestamp || Date.now()).toISOString(),
+                    read: notification.read || false
+                };
+                
+                // Restore action with callback function
+                if (notification.action && notification.action.text) {
+                    restoredNotification.action = {
+                        text: notification.action.text,
+                        callback: () => {
+                            // Find the job by title or message to restore callback
+                            const job = AppState.jobs.find(j => 
+                                notification.title.includes(j.companyName) || 
+                                notification.message.includes(j.companyName)
+                            );
+                            if (job) {
+                                showJobDetail(job.id);
+                            }
+                        }
+                    };
+                }
+                
+                return restoredNotification;
+            });
+            
             AppState.admins = data.admins || [];
             
-            console.log('Data loaded from Firebase - Jobs count:', AppState.jobs.length);
+            console.log('✅ Data loaded from Firebase - Jobs count:', AppState.jobs.length);
+            showNotification('Data loaded from cloud!', 'success');
         } else {
             // First time load - start with empty data
             AppState.jobs = [];
@@ -63,14 +118,16 @@ async function loadDataFromFirebase() {
                 notifications: AppState.notifications,
                 admins: AppState.admins
             });
-            console.log('First time load - empty data saved to Firebase');
+            console.log('✅ First time load - empty data saved to Firebase');
         }
         
         AppState.filteredJobs = [...AppState.jobs];
         AppState.filteredShortlistedData = [...AppState.shortlistedData];
         
     } catch (error) {
-        console.error('Error loading from Firebase:', error);
+        console.error('❌ Error loading from Firebase:', error);
+        console.error('Error details:', error.message);
+        showNotification('Using offline mode - loading from local storage', 'warning');
         // Fallback to localStorage
         loadDataFromStorage();
     }
@@ -425,10 +482,13 @@ function createJobCard(job, index) {
     card.onclick = () => showJobDetail(job.id);
     
     const statusClass = job.status.toLowerCase().replace(' ', '-');
-    const formattedDeadline = new Date(job.deadline).toLocaleDateString('en-IN', {
+    const formattedDeadline = new Date(job.deadline).toLocaleString('en-IN', {
         day: 'numeric',
         month: 'short',
-        year: 'numeric'
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
     });
     
     card.innerHTML = `
@@ -497,10 +557,13 @@ function showJobDetail(jobId) {
     const modal = document.getElementById('job-detail-modal');
     const content = document.getElementById('job-detail-content');
     
-    const formattedDeadline = new Date(job.deadline).toLocaleDateString('en-IN', {
+    const formattedDeadline = new Date(job.deadline).toLocaleString('en-IN', {
         day: 'numeric',
         month: 'long',
-        year: 'numeric'
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
     });
     
     const statusClass = job.status.toLowerCase().replace(' ', '-');
@@ -632,7 +695,14 @@ function createAdminJobCard(job) {
     const card = document.createElement('div');
     card.className = 'admin-job-card';
     
-    const formattedDeadline = new Date(job.deadline).toLocaleDateString('en-IN');
+    const formattedDeadline = new Date(job.deadline).toLocaleString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
     const statusClass = job.status.toLowerCase().replace(' ', '-');
     const hasShortlisted = AppState.jobShortlisted[job.id] && AppState.jobShortlisted[job.id].length > 0;
     
@@ -702,7 +772,10 @@ function editJob(jobId) {
     // Populate form with job data
     document.getElementById('job-company').value = job.company;
     document.getElementById('job-title').value = job.title;
-    document.getElementById('job-deadline').value = job.deadline;
+    // Format deadline for datetime-local input (YYYY-MM-DDTHH:MM)
+    const deadlineDate = new Date(job.deadline);
+    const formattedDeadline = deadlineDate.toISOString().slice(0, 16);
+    document.getElementById('job-deadline').value = formattedDeadline;
     document.getElementById('job-status').value = job.status;
     document.getElementById('job-description').value = job.description;
     document.getElementById('job-salary').value = job.salary;
@@ -723,7 +796,7 @@ function handleJobSubmit(event) {
     const jobData = {
         company: document.getElementById('job-company').value,
         title: document.getElementById('job-title').value,
-        deadline: document.getElementById('job-deadline').value,
+        deadline: new Date(document.getElementById('job-deadline').value).toISOString(),
         status: document.getElementById('job-status').value,
         description: document.getElementById('job-description').value,
         salary: document.getElementById('job-salary').value,
@@ -753,7 +826,14 @@ function handleJobSubmit(event) {
         addNotification({
             type: 'success',
             title: `New Job Opening: ${jobData.title}`,
-            message: `${jobData.company} is hiring for ${jobData.title} position. Application deadline: ${new Date(jobData.deadline).toLocaleDateString()}`,
+            message: `${jobData.company} is hiring for ${jobData.title} position. Application deadline: ${new Date(jobData.deadline).toLocaleString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            })}`,
             action: {
                 text: 'View Details',
                 callback: () => showJobDetail(newJob.id)
@@ -2083,7 +2163,8 @@ function addNotification(notification) {
         type: notification.type || 'info',
         title: notification.title,
         message: notification.message,
-        time: notification.time || new Date().toISOString(),
+        timestamp: Date.now(), // Use timestamp for Firebase compatibility
+        time: new Date().toISOString(), // Keep time for display
         read: false,
         action: notification.action || null
     };
