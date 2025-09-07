@@ -11,77 +11,12 @@ const AppState = {
     currentCompanyFullData: null,
     showShortlistedBanner: false,
     notifications: [],
-    jobShortlisted: {} // Store shortlisted data per job
+    jobShortlisted: {}, // Store shortlisted data per job
+    admins: [] // Store admin users
 };
 
-// Sample Data
-const sampleJobs = [
-    {
-        id: 1,
-        company: "TechCorp Solutions",
-        title: "Software Developer",
-        status: "Open",
-        deadline: "2024-02-15",
-        description: "We are looking for a passionate Software Developer to join our dynamic team. You will be responsible for designing, developing, and maintaining web applications using modern technologies.",
-        salary: "4-6 LPA",
-        location: "Bangalore, India",
-        eligibility: "B.Tech/B.E in Computer Science or related field. Strong knowledge of JavaScript, React, Node.js. Minimum 70% throughout academics.",
-        formLink: "https://forms.google.com/example1",
-        applicants: []
-    },
-    {
-        id: 2,
-        company: "DataFlow Analytics",
-        title: "Data Analyst",
-        status: "Interviewing",
-        deadline: "2024-02-10",
-        description: "Join our data team to help transform raw data into actionable insights. You'll work with large datasets and create meaningful visualizations for business stakeholders.",
-        salary: "3.5-5 LPA",
-        location: "Hyderabad, India",
-        eligibility: "B.Tech/B.E/MCA in any discipline. Knowledge of SQL, Python, Excel. Strong analytical skills required.",
-        formLink: "https://forms.google.com/example2",
-        applicants: []
-    },
-    {
-        id: 3,
-        company: "CloudVision Systems",
-        title: "DevOps Engineer",
-        status: "Open",
-        deadline: "2024-02-20",
-        description: "We're seeking a DevOps Engineer to streamline our development and deployment processes. Experience with AWS, Docker, and CI/CD pipelines preferred.",
-        salary: "5-7 LPA",
-        location: "Pune, India",
-        eligibility: "B.Tech in Computer Science/IT. Experience with cloud platforms, containerization, and automation tools.",
-        formLink: "https://forms.google.com/example3",
-        applicants: []
-    },
-    {
-        id: 4,
-        company: "FinTech Innovations",
-        title: "Frontend Developer",
-        status: "Closed",
-        deadline: "2024-01-30",
-        description: "Create beautiful and responsive user interfaces for our financial applications. Work with React, Vue.js, and modern CSS frameworks.",
-        salary: "4-5.5 LPA",
-        location: "Mumbai, India",
-        eligibility: "B.Tech/B.E in Computer Science. Proficiency in HTML, CSS, JavaScript, React/Vue.js. Portfolio required.",
-        formLink: "https://forms.google.com/example4",
-        applicants: []
-    },
-    {
-        id: 5,
-        company: "AI Research Labs",
-        title: "Machine Learning Engineer",
-        status: "Open",
-        deadline: "2024-02-25",
-        description: "Join our AI team to develop cutting-edge machine learning solutions. Work on exciting projects involving computer vision, NLP, and predictive analytics.",
-        salary: "6-9 LPA",
-        location: "Chennai, India",
-        eligibility: "M.Tech/B.Tech in Computer Science/AI/ML. Strong knowledge of Python, TensorFlow, PyTorch. Research experience preferred.",
-        formLink: "https://forms.google.com/example5",
-        applicants: []
-    }
-];
+// Sample Data - Empty array for clean start
+const sampleJobs = [];
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -109,7 +44,8 @@ function saveDataToStorage() {
             jobs: AppState.jobs,
             shortlistedData: AppState.shortlistedData,
             jobShortlisted: AppState.jobShortlisted,
-            notifications: AppState.notifications
+            notifications: AppState.notifications,
+            admins: AppState.admins
         };
         localStorage.setItem('placementPortalData', JSON.stringify(dataToSave));
         console.log('Data saved to localStorage');
@@ -124,23 +60,26 @@ function loadDataFromStorage() {
         if (savedData) {
             const data = JSON.parse(savedData);
             
-            // Load saved data or use defaults
-            AppState.jobs = data.jobs && data.jobs.length > 0 ? data.jobs : [...sampleJobs];
+            // Load saved data (even if empty array - this preserves deletions)
+            AppState.jobs = data.jobs !== undefined ? data.jobs : [...sampleJobs];
             AppState.shortlistedData = data.shortlistedData || [];
             AppState.jobShortlisted = data.jobShortlisted || {};
             AppState.notifications = data.notifications || [];
+            AppState.admins = data.admins || [];
             
-            console.log('Data loaded from localStorage');
+            console.log('Data loaded from localStorage - Jobs count:', AppState.jobs.length);
+            console.log('Loaded jobs:', AppState.jobs);
         } else {
-            // First time load - use sample data
-            AppState.jobs = [...sampleJobs];
+            // First time load - start with empty data
+            AppState.jobs = [];
             AppState.shortlistedData = [];
             AppState.jobShortlisted = {};
             AppState.notifications = [];
+            AppState.admins = [];
             
-            // Save initial data
+            // Save initial empty data
             saveDataToStorage();
-            console.log('First time load - sample data saved');
+            console.log('First time load - empty data saved');
         }
         
         AppState.filteredJobs = [...AppState.jobs];
@@ -148,24 +87,63 @@ function loadDataFromStorage() {
         
     } catch (error) {
         console.error('Error loading from localStorage:', error);
-        // Fallback to sample data
-        AppState.jobs = [...sampleJobs];
-        AppState.filteredJobs = [...sampleJobs];
+        // Fallback to empty data
+        AppState.jobs = [];
+        AppState.filteredJobs = [];
         AppState.shortlistedData = [];
         AppState.jobShortlisted = {};
         AppState.notifications = [];
+        AppState.admins = [];
     }
 }
 
-function clearAllData() {
-    if (confirm('Are you sure you want to clear all data? This will reset everything to defaults and reload the page.')) {
-        localStorage.removeItem('placementPortalData');
-        showNotification('All data cleared. Page will reload.', 'info');
-        setTimeout(() => {
-            location.reload();
-        }, 1000);
+
+// Debug function to check localStorage data
+function debugLocalStorage() {
+    const savedData = localStorage.getItem('placementPortalData');
+    if (savedData) {
+        const data = JSON.parse(savedData);
+        console.log('Current localStorage data:', data);
+        console.log('Jobs in storage:', data.jobs ? data.jobs.length : 'undefined');
+    } else {
+        console.log('No data in localStorage');
     }
 }
+
+// Make debug function available globally for testing
+window.debugLocalStorage = debugLocalStorage;
+
+// Debug function to create a test job
+function createTestJob() {
+    const testJob = {
+        id: 1,
+        company: "Test Company",
+        title: "Test Position",
+        status: "Open",
+        deadline: "2024-12-31",
+        description: "This is a test job for debugging purposes.",
+        salary: "5-7 LPA",
+        location: "Test City",
+        eligibility: "B.Tech in any field",
+        batches: "2024, 2025",
+        branches: "CSE, IT, ECE",
+        selectionProcess: "Written test followed by interview",
+        formLink: "https://forms.google.com/test",
+        applicants: []
+    };
+    
+    AppState.jobs.push(testJob);
+    AppState.filteredJobs = [...AppState.jobs];
+    saveDataToStorage();
+    loadAdminJobList();
+    loadJobs();
+    
+    console.log('Test job created:', testJob);
+    showNotification('Test job created successfully!', 'success');
+}
+
+// Make test function available globally
+window.createTestJob = createTestJob;
 
 // Navigation Functions
 function showStudentDashboard() {
@@ -396,13 +374,26 @@ function handleAdminLogin(event) {
     const username = document.getElementById('admin-username').value;
     const password = document.getElementById('admin-password').value;
     
-    // Simple authentication (in real app, this would be server-side)
-    if (username === 'admin' && password === 'admin123') {
-        AppState.currentUser = { username: 'admin', role: 'admin' };
+    // Check against default admin or stored admins
+    let isValidAdmin = false;
+    
+    // Check default admin
+    if (username === 'himu' && password === 'himu1234') {
+        isValidAdmin = true;
+    } else {
+        // Check stored admins
+        const admin = AppState.admins.find(admin => admin.username === username && admin.password === password);
+        if (admin) {
+            isValidAdmin = true;
+        }
+    }
+    
+    if (isValidAdmin) {
+        AppState.currentUser = { username: username, role: 'admin' };
         showNotification('Login successful!', 'success');
         showAdminDashboard();
     } else {
-        showNotification('Invalid credentials. Use admin/admin123', 'error');
+        showNotification('Invalid credentials', 'error');
     }
 }
 
@@ -416,6 +407,7 @@ function logout() {
 function loadAdminDashboard() {
     loadAdminJobList();
     loadAdminNotifications();
+    loadAdminList();
 }
 
 
@@ -549,7 +541,7 @@ function handleJobSubmit(event) {
     } else {
         // Add new job
         const newJob = {
-            id: Math.max(...AppState.jobs.map(j => j.id)) + 1,
+            id: AppState.jobs.length > 0 ? Math.max(...AppState.jobs.map(j => j.id)) + 1 : 1,
             ...jobData,
             applicants: []
         };
@@ -605,7 +597,11 @@ function deleteJob(jobId) {
         AppState.filteredJobs = [...AppState.jobs];
         // Also remove any shortlisted data for this job
         delete AppState.jobShortlisted[jobId];
+        
+        console.log('Jobs after deletion:', AppState.jobs.length);
         saveDataToStorage(); // Save to localStorage
+        console.log('Data saved to localStorage after deletion');
+        
         loadAdminJobList();
         loadJobs();
         showNotification('Job deleted successfully!', 'success');
@@ -853,6 +849,8 @@ document.addEventListener('click', function(event) {
                 closeJobForm();
             } else if (modal.id === 'file-upload-modal') {
                 closeFileUpload();
+            } else if (modal.id === 'add-admin-modal') {
+                closeAddAdminModal();
             }
         }
     });
@@ -869,6 +867,8 @@ document.addEventListener('keydown', function(event) {
                 closeJobForm();
             } else if (activeModal.id === 'file-upload-modal') {
                 closeFileUpload();
+            } else if (activeModal.id === 'add-admin-modal') {
+                closeAddAdminModal();
             }
         }
     }
@@ -1666,54 +1666,72 @@ function updateCompanyIcon(companyName) {
 function updateCompanyDescription(companyName, candidateCount) {
     const descriptionElement = document.getElementById('company-modal-description');
     
-    // Get company type for description
-    const companyLower = companyName.toLowerCase();
+    // Try to find the actual job's selection process first
+    let actualSelectionProcess = '';
+    const companyJobs = AppState.jobs.filter(job => job.company === companyName);
+    
+    if (companyJobs.length > 0) {
+        // Use the selection process from the first job of this company
+        actualSelectionProcess = companyJobs[0].selectionProcess || '';
+    }
+    
     let description = '';
     
-    if (companyLower.includes('tech') || companyLower.includes('software')) {
+    if (actualSelectionProcess && actualSelectionProcess.trim()) {
+        // Use the actual job's selection process
         description = `
             <h5>About the Selection Process:</h5>
-            <p>Technology company with focus on software development and innovation.</p>
-            <ul>
-                <li>Technical interview rounds</li>
-                <li>Coding assessments</li>
-                <li>System design discussions</li>
-                <li>HR and cultural fit interview</li>
-            </ul>
-        `;
-    } else if (companyLower.includes('bank') || companyLower.includes('finance')) {
-        description = `
-            <h5>About the Selection Process:</h5>
-            <p>Financial services organization with emphasis on analytical and communication skills.</p>
-            <ul>
-                <li>Aptitude and reasoning tests</li>
-                <li>Financial knowledge assessment</li>
-                <li>Group discussions</li>
-                <li>Personal interview</li>
-            </ul>
-        `;
-    } else if (companyLower.includes('consult')) {
-        description = `
-            <h5>About the Selection Process:</h5>
-            <p>Consulting firm focused on problem-solving and client interaction skills.</p>
-            <ul>
-                <li>Case study analysis</li>
-                <li>Presentation skills assessment</li>
-                <li>Client simulation exercises</li>
-                <li>Partner interview</li>
-            </ul>
+            <p>${actualSelectionProcess}</p>
         `;
     } else {
-        description = `
-            <h5>About the Selection Process:</h5>
-            <p>Multi-stage selection process to identify the best candidates.</p>
-            <ul>
-                <li>Written examination</li>
-                <li>Technical/domain assessment</li>
-                <li>Personal interview</li>
-                <li>Final HR discussion</li>
-            </ul>
-        `;
+        // Fallback to generic descriptions based on company type
+        const companyLower = companyName.toLowerCase();
+        
+        if (companyLower.includes('tech') || companyLower.includes('software')) {
+            description = `
+                <h5>About the Selection Process:</h5>
+                <p>Technology company with focus on software development and innovation.</p>
+                <ul>
+                    <li>Technical interview rounds</li>
+                    <li>Coding assessments</li>
+                    <li>System design discussions</li>
+                    <li>HR and cultural fit interview</li>
+                </ul>
+            `;
+        } else if (companyLower.includes('bank') || companyLower.includes('finance')) {
+            description = `
+                <h5>About the Selection Process:</h5>
+                <p>Financial services organization with emphasis on analytical and communication skills.</p>
+                <ul>
+                    <li>Aptitude and reasoning tests</li>
+                    <li>Financial knowledge assessment</li>
+                    <li>Group discussions</li>
+                    <li>Personal interview</li>
+                </ul>
+            `;
+        } else if (companyLower.includes('consult')) {
+            description = `
+                <h5>About the Selection Process:</h5>
+                <p>Consulting firm focused on problem-solving and client interaction skills.</p>
+                <ul>
+                    <li>Case study analysis</li>
+                    <li>Presentation skills assessment</li>
+                    <li>Client simulation exercises</li>
+                    <li>Partner interview</li>
+                </ul>
+            `;
+        } else {
+            description = `
+                <h5>About the Selection Process:</h5>
+                <p>Multi-stage selection process to identify the best candidates.</p>
+                <ul>
+                    <li>Written examination</li>
+                    <li>Technical/domain assessment</li>
+                    <li>Personal interview</li>
+                    <li>Final HR discussion</li>
+                </ul>
+            `;
+        }
     }
     
     descriptionElement.innerHTML = description;
@@ -1988,9 +2006,16 @@ function executeNotificationAction(notificationId) {
 // Job-Specific Shortlist Functions
 function showJobShortlistUpload(jobId) {
     const job = AppState.jobs.find(j => j.id === jobId);
-    if (!job) return;
+    if (!job) {
+        showNotification('Job not found. Please try again.', 'error');
+        return;
+    }
     
     AppState.currentJobId = jobId;
+    
+    // Store job ID in modal data attribute for persistence
+    const modal = document.getElementById('job-shortlist-modal');
+    modal.setAttribute('data-job-id', jobId);
     
     // Update modal content
     document.getElementById('job-shortlist-title').textContent = 
@@ -2003,7 +2028,7 @@ function showJobShortlistUpload(jobId) {
     document.getElementById('job-shortlist-file-input').value = '';
     
     // Show modal
-    document.getElementById('job-shortlist-modal').classList.add('active');
+    modal.classList.add('active');
     document.body.style.overflow = 'hidden';
 }
 
@@ -2012,7 +2037,7 @@ function closeJobShortlistModal() {
     document.body.style.overflow = 'auto';
     AppState.currentJobId = null;
     
-    // Reset form
+    // Reset form but keep data-job-id attribute for persistence
     document.getElementById('job-shortlist-file-input').value = '';
     document.getElementById('job-shortlist-data-viewer').style.display = 'none';
     document.getElementById('job-shortlist-upload-progress').style.display = 'none';
@@ -2160,13 +2185,25 @@ function saveJobShortlistData() {
             return;
         }
         
-        if (!AppState.currentJobId) {
+        // Get job ID from modal data attribute or AppState
+        let jobId = AppState.currentJobId;
+        
+        // If currentJobId is null, try to get it from modal data attribute
+        if (!jobId) {
+            const modal = document.getElementById('job-shortlist-modal');
+            const modalJobId = modal.getAttribute('data-job-id');
+            if (modalJobId) {
+                jobId = parseInt(modalJobId);
+            }
+        }
+        
+        if (!jobId) {
             showNotification('Please select a job first', 'error');
             return;
         }
         
         // Find job
-        const jobId = parseInt(AppState.currentJobId);
+        jobId = parseInt(jobId);
         const job = AppState.jobs.find(j => j.id === jobId);
         
         if (!job) {
@@ -2650,4 +2687,118 @@ function closeFullCompanyListModal() {
     document.getElementById('full-company-list-modal').classList.remove('active');
     document.body.style.overflow = 'auto';
     AppState.currentCompanyFullData = null;
+}
+
+// Admin Management Functions
+function loadAdminList() {
+    const adminList = document.getElementById('admin-list');
+    if (!adminList) {
+        console.log('admin-list element not found, skipping admin list load');
+        return;
+    }
+    
+    adminList.innerHTML = '';
+    
+    // Add default admin
+    const defaultAdmin = {
+        id: 'default',
+        username: 'himu',
+        email: 'admin@dsi.com',
+        isDefault: true,
+        createdDate: new Date().toISOString()
+    };
+    
+    const allAdmins = [defaultAdmin, ...AppState.admins];
+    
+    allAdmins.forEach(admin => {
+        const adminCard = createAdminCard(admin);
+        adminList.appendChild(adminCard);
+    });
+}
+
+function createAdminCard(admin) {
+    const card = document.createElement('div');
+    card.className = 'admin-card';
+    
+    const createdDate = new Date(admin.createdDate).toLocaleDateString('en-IN');
+    
+    card.innerHTML = `
+        <div class="admin-card-header">
+            <div class="admin-card-info">
+                <h4>${admin.username}</h4>
+                <p>${admin.email || 'No email provided'}</p>
+                <span class="admin-role">${admin.isDefault ? 'Default Admin' : 'Admin'}</span>
+            </div>
+            <div class="admin-card-actions">
+                ${!admin.isDefault ? `
+                    <button class="admin-btn delete-btn" onclick="deleteAdmin('${admin.id}')" title="Delete Admin">
+                        <i class="fas fa-trash"></i>
+                        Delete
+                    </button>
+                ` : `
+                    <span class="default-admin-badge">Default</span>
+                `}
+            </div>
+        </div>
+        <div class="admin-card-details">
+            <span class="admin-created">Created: ${createdDate}</span>
+        </div>
+    `;
+    
+    return card;
+}
+
+function showAddAdminModal() {
+    document.getElementById('add-admin-modal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('admin-form').reset();
+}
+
+function closeAddAdminModal() {
+    document.getElementById('add-admin-modal').classList.remove('active');
+    document.body.style.overflow = 'auto';
+    document.getElementById('admin-form').reset();
+}
+
+function handleAdminSubmit(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById('new-admin-username').value;
+    const password = document.getElementById('new-admin-password').value;
+    const email = document.getElementById('new-admin-email').value;
+    
+    // Check if username already exists
+    const existingAdmin = AppState.admins.find(admin => admin.username === username);
+    if (existingAdmin || username === 'himu') {
+        showNotification('Username already exists. Please choose a different username.', 'error');
+        return;
+    }
+    
+    // Create new admin
+    const newAdmin = {
+        id: Date.now().toString(),
+        username: username,
+        password: password,
+        email: email,
+        createdDate: new Date().toISOString()
+    };
+    
+    AppState.admins.push(newAdmin);
+    saveDataToStorage();
+    loadAdminList();
+    
+    showNotification(`Admin "${username}" added successfully!`, 'success');
+    closeAddAdminModal();
+}
+
+function deleteAdmin(adminId) {
+    const admin = AppState.admins.find(admin => admin.id === adminId);
+    if (!admin) return;
+    
+    if (confirm(`Are you sure you want to delete admin "${admin.username}"?`)) {
+        AppState.admins = AppState.admins.filter(admin => admin.id !== adminId);
+        saveDataToStorage();
+        loadAdminList();
+        showNotification(`Admin "${admin.username}" deleted successfully!`, 'success');
+    }
 }
