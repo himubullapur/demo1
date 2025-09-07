@@ -1,3 +1,169 @@
+// Firebase Database Functions
+let isFirebaseReady = false;
+let firebaseListeners = {};
+
+// Wait for Firebase to be ready
+function waitForFirebase() {
+    return new Promise((resolve) => {
+        if (window.firebaseDatabase && window.firebaseRef) {
+            isFirebaseReady = true;
+            resolve();
+        } else {
+            setTimeout(() => waitForFirebase().then(resolve), 100);
+        }
+    });
+}
+
+// Firebase Database Functions
+async function saveDataToFirebase(data) {
+    if (!isFirebaseReady) await waitForFirebase();
+    
+    try {
+        const dataRef = window.firebaseRef(window.firebaseDatabase, 'placementPortalData');
+        await window.firebaseSet(dataRef, data);
+        console.log('Data saved to Firebase');
+    } catch (error) {
+        console.error('Error saving to Firebase:', error);
+        // Fallback to localStorage
+        localStorage.setItem('placementPortalData', JSON.stringify(data));
+    }
+}
+
+async function loadDataFromFirebase() {
+    if (!isFirebaseReady) await waitForFirebase();
+    
+    try {
+        const dataRef = window.firebaseRef(window.firebaseDatabase, 'placementPortalData');
+        const snapshot = await window.firebaseGet(dataRef);
+        
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            
+            // Load saved data
+            AppState.jobs = data.jobs !== undefined ? data.jobs : [];
+            AppState.shortlistedData = data.shortlistedData || [];
+            AppState.jobShortlisted = data.jobShortlisted || {};
+            AppState.notifications = data.notifications || [];
+            AppState.admins = data.admins || [];
+            
+            console.log('Data loaded from Firebase - Jobs count:', AppState.jobs.length);
+        } else {
+            // First time load - start with empty data
+            AppState.jobs = [];
+            AppState.shortlistedData = [];
+            AppState.jobShortlisted = {};
+            AppState.notifications = [];
+            AppState.admins = [];
+            
+            // Save initial empty data
+            await saveDataToFirebase({
+                jobs: AppState.jobs,
+                shortlistedData: AppState.shortlistedData,
+                jobShortlisted: AppState.jobShortlisted,
+                notifications: AppState.notifications,
+                admins: AppState.admins
+            });
+            console.log('First time load - empty data saved to Firebase');
+        }
+        
+        AppState.filteredJobs = [...AppState.jobs];
+        AppState.filteredShortlistedData = [...AppState.shortlistedData];
+        
+    } catch (error) {
+        console.error('Error loading from Firebase:', error);
+        // Fallback to localStorage
+        loadDataFromStorage();
+    }
+}
+
+// Connection status management
+function updateConnectionStatus(status) {
+    const indicator = document.getElementById('connection-indicator');
+    if (!indicator) return;
+    
+    const icon = indicator.querySelector('i');
+    const text = indicator.querySelector('span');
+    
+    switch (status) {
+        case 'connected':
+            indicator.className = 'connection-indicator connected';
+            icon.className = 'fas fa-wifi';
+            text.textContent = 'Live Sync';
+            break;
+        case 'connecting':
+            indicator.className = 'connection-indicator connecting';
+            icon.className = 'fas fa-wifi';
+            text.textContent = 'Connecting...';
+            break;
+        case 'offline':
+            indicator.className = 'connection-indicator offline';
+            icon.className = 'fas fa-wifi-slash';
+            text.textContent = 'Offline Mode';
+            break;
+        case 'error':
+            indicator.className = 'connection-indicator error';
+            icon.className = 'fas fa-exclamation-triangle';
+            text.textContent = 'Sync Error';
+            break;
+    }
+}
+
+// Real-time listeners for instant updates
+function setupFirebaseListeners() {
+    if (!isFirebaseReady) {
+        updateConnectionStatus('connecting');
+        return;
+    }
+    
+    try {
+        const dataRef = window.firebaseRef(window.firebaseDatabase, 'placementPortalData');
+        
+        // Listen for real-time updates
+        const unsubscribe = window.firebaseOnValue(dataRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                
+                // Update app state
+                AppState.jobs = data.jobs || [];
+                AppState.shortlistedData = data.shortlistedData || [];
+                AppState.jobShortlisted = data.jobShortlisted || {};
+                AppState.notifications = data.notifications || [];
+                AppState.admins = data.admins || [];
+                
+                AppState.filteredJobs = [...AppState.jobs];
+                AppState.filteredShortlistedData = [...AppState.shortlistedData];
+                
+                // Update UI if needed
+                if (document.getElementById('admin-job-list')) {
+                    loadAdminJobList();
+                }
+                if (document.getElementById('job-listings')) {
+                    loadJobs();
+                }
+                if (document.getElementById('admin-list')) {
+                    loadAdminList();
+                }
+                if (document.getElementById('companies-grid')) {
+                    loadCompanyView();
+                }
+                
+                updateConnectionStatus('connected');
+                console.log('Real-time update received from Firebase');
+            }
+        }, (error) => {
+            console.error('Firebase listener error:', error);
+            updateConnectionStatus('error');
+        });
+        
+        firebaseListeners.data = unsubscribe;
+        console.log('Firebase real-time listeners set up');
+        
+    } catch (error) {
+        console.error('Error setting up Firebase listeners:', error);
+        updateConnectionStatus('error');
+    }
+}
+
 // Global State Management
 const AppState = {
     currentUser: null,
@@ -23,9 +189,15 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
 });
 
-function initializeApp() {
-    // Load data from localStorage or use sample data
-    loadDataFromStorage();
+async function initializeApp() {
+    // Load data from Firebase (with localStorage fallback)
+    await loadDataFromFirebase();
+    
+    // Set up real-time listeners
+    setupFirebaseListeners();
+    
+    // Set up offline detection
+    setupOfflineDetection();
     
     // Show student dashboard by default
     showStudentDashboard();
@@ -37,18 +209,48 @@ function initializeApp() {
     animateElements();
 }
 
-// LocalStorage functions for GitHub Pages persistence
-function saveDataToStorage() {
+// Offline detection and handling
+function setupOfflineDetection() {
+    // Listen for online/offline events
+    window.addEventListener('online', () => {
+        console.log('Connection restored');
+        updateConnectionStatus('connecting');
+        // Try to reconnect to Firebase
+        setTimeout(() => {
+            setupFirebaseListeners();
+        }, 1000);
+    });
+    
+    window.addEventListener('offline', () => {
+        console.log('Connection lost');
+        updateConnectionStatus('offline');
+    });
+    
+    // Initial connection status
+    if (navigator.onLine) {
+        updateConnectionStatus('connecting');
+    } else {
+        updateConnectionStatus('offline');
+    }
+}
+
+// Data persistence functions (Firebase with localStorage fallback)
+async function saveDataToStorage() {
+    const dataToSave = {
+        jobs: AppState.jobs,
+        shortlistedData: AppState.shortlistedData,
+        jobShortlisted: AppState.jobShortlisted,
+        notifications: AppState.notifications,
+        admins: AppState.admins
+    };
+    
+    // Save to Firebase (primary)
+    await saveDataToFirebase(dataToSave);
+    
+    // Also save to localStorage as backup
     try {
-        const dataToSave = {
-            jobs: AppState.jobs,
-            shortlistedData: AppState.shortlistedData,
-            jobShortlisted: AppState.jobShortlisted,
-            notifications: AppState.notifications,
-            admins: AppState.admins
-        };
         localStorage.setItem('placementPortalData', JSON.stringify(dataToSave));
-        console.log('Data saved to localStorage');
+        console.log('Data saved to localStorage as backup');
     } catch (error) {
         console.error('Error saving to localStorage:', error);
     }
