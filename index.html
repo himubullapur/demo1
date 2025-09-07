@@ -7,6 +7,45 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, set, get, onValue, push, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        
+        // Firebase configuration
+        // TODO: Replace with your actual Firebase configuration
+        // 1. Go to https://console.firebase.google.com/
+        // 2. Create a new project or select existing one
+        // 3. Go to Project Settings > General > Your apps
+        // 4. Add a web app and copy the config object
+        // 5. Replace the values below with your actual config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            authDomain: "placement-portal-xxxxx.firebaseapp.com",
+            databaseURL: "https://placement-portal-xxxxx-default-rtdb.firebaseio.com",
+            projectId: "placement-portal-xxxxx",
+            storageBucket: "placement-portal-xxxxx.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdefghijklmnop"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        
+        // Make Firebase functions available globally
+        window.firebaseDatabase = database;
+        window.firebaseRef = ref;
+        window.firebaseSet = set;
+        window.firebaseGet = get;
+        window.firebaseOnValue = onValue;
+        window.firebasePush = push;
+        window.firebaseRemove = remove;
+        
+        console.log('Firebase initialized successfully');
+    </script>
+    
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -25,6 +64,12 @@
                     <a href="#" onclick="showStudentDashboard()" class="nav-link active" id="student-nav">Student Portal</a>
                     <a href="#" onclick="showShortlistedView()" class="nav-link" id="shortlisted-nav">Shortlisted</a>
                     <a href="#" onclick="showAdminLogin()" class="nav-link" id="admin-nav">Admin Panel</a>
+                </div>
+                <div class="connection-status">
+                    <div id="connection-indicator" class="connection-indicator">
+                        <i class="fas fa-wifi"></i>
+                        <span>Connecting...</span>
+                    </div>
                 </div>
             </div>
         </nav>
