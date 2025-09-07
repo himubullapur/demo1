@@ -89,9 +89,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
-    // Load sample data
-    AppState.jobs = [...sampleJobs];
-    AppState.filteredJobs = [...sampleJobs];
+    // Load data from localStorage or use sample data
+    loadDataFromStorage();
     
     // Show student dashboard by default
     showStudentDashboard();
@@ -101,6 +100,71 @@ function initializeApp() {
     
     // Initialize animations
     animateElements();
+}
+
+// LocalStorage functions for GitHub Pages persistence
+function saveDataToStorage() {
+    try {
+        const dataToSave = {
+            jobs: AppState.jobs,
+            shortlistedData: AppState.shortlistedData,
+            jobShortlisted: AppState.jobShortlisted,
+            notifications: AppState.notifications
+        };
+        localStorage.setItem('placementPortalData', JSON.stringify(dataToSave));
+        console.log('Data saved to localStorage');
+    } catch (error) {
+        console.error('Error saving to localStorage:', error);
+    }
+}
+
+function loadDataFromStorage() {
+    try {
+        const savedData = localStorage.getItem('placementPortalData');
+        if (savedData) {
+            const data = JSON.parse(savedData);
+            
+            // Load saved data or use defaults
+            AppState.jobs = data.jobs && data.jobs.length > 0 ? data.jobs : [...sampleJobs];
+            AppState.shortlistedData = data.shortlistedData || [];
+            AppState.jobShortlisted = data.jobShortlisted || {};
+            AppState.notifications = data.notifications || [];
+            
+            console.log('Data loaded from localStorage');
+        } else {
+            // First time load - use sample data
+            AppState.jobs = [...sampleJobs];
+            AppState.shortlistedData = [];
+            AppState.jobShortlisted = {};
+            AppState.notifications = [];
+            
+            // Save initial data
+            saveDataToStorage();
+            console.log('First time load - sample data saved');
+        }
+        
+        AppState.filteredJobs = [...AppState.jobs];
+        AppState.filteredShortlistedData = [...AppState.shortlistedData];
+        
+    } catch (error) {
+        console.error('Error loading from localStorage:', error);
+        // Fallback to sample data
+        AppState.jobs = [...sampleJobs];
+        AppState.filteredJobs = [...sampleJobs];
+        AppState.shortlistedData = [];
+        AppState.jobShortlisted = {};
+        AppState.notifications = [];
+    }
+}
+
+function clearAllData() {
+    if (confirm('Are you sure you want to clear all data? This will reset everything to defaults and reload the page.')) {
+        localStorage.removeItem('placementPortalData');
+        showNotification('All data cleared. Page will reload.', 'info');
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
+    }
 }
 
 // Navigation Functions
@@ -507,6 +571,7 @@ function handleJobSubmit(event) {
     
     // Update filtered jobs and reload
     AppState.filteredJobs = [...AppState.jobs];
+    saveDataToStorage(); // Save to localStorage
     closeJobForm();
     loadAdminJobList();
     loadJobs();
@@ -529,6 +594,7 @@ function updateJobStatus(jobId, newStatus) {
         }, 150);
         
         loadJobs();
+        saveDataToStorage(); // Save to localStorage
         showNotification(`Job status updated to ${newStatus}`, 'success');
     }
 }
@@ -537,6 +603,9 @@ function deleteJob(jobId) {
     if (confirm('Are you sure you want to delete this job?')) {
         AppState.jobs = AppState.jobs.filter(j => j.id !== jobId);
         AppState.filteredJobs = [...AppState.jobs];
+        // Also remove any shortlisted data for this job
+        delete AppState.jobShortlisted[jobId];
+        saveDataToStorage(); // Save to localStorage
         loadAdminJobList();
         loadJobs();
         showNotification('Job deleted successfully!', 'success');
@@ -1806,6 +1875,7 @@ function addNotification(notification) {
         AppState.notifications = AppState.notifications.slice(0, 10);
     }
     
+    saveDataToStorage(); // Save to localStorage
     displayNotifications();
 }
 
@@ -2127,6 +2197,9 @@ function saveJobShortlistData() {
         
         // Clear temp data
         window.tempJobShortlistData = null;
+        
+        // Save to localStorage
+        saveDataToStorage();
         
         // Reload admin interface (only if on admin page)
         if (document.getElementById('admin-job-list')) {
